@@ -39,6 +39,8 @@ app.use("/vote",voteRouter)
 
 app.use("/uploads",uploadRouter)
 
+app.use("/redis")
+
 export default app
 
 

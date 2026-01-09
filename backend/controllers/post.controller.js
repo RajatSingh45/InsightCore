@@ -3,6 +3,8 @@ import postModel from "../models/post.model.js";
 import mongoose from "mongoose";
 import voteModel from "../models/vote.model.js";
 import likeCommentModel from "../models/likeCommentModel.js";
+import {deleteCache, getCache, setCache } from "../services/cache.service.js";
+// import redis from "../configs/redis.js";
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -27,12 +29,14 @@ const createPost = async (req, res) => {
 
     const newPost = await post.populate("author", "name email");
 
+    await deleteCache("posts:allPosts:*");
+
     res
       .status(201)
       .json({ success: true, message: "New post created succefully", newPost });
   } catch (error) {
     console.log("Error during creating the post:", error.message);
-    return res.status(500).josn({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -41,8 +45,23 @@ const getAllPost = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
     const limit = Math.min(20, parseInt(req.query.limit || "10", 10));
     const skip = (page - 1) * limit;
-
     const sortBy = (req.query.sort || "newest").toLowerCase();
+
+    const cacheKey = `posts:allPosts:page${page}:limit${limit}:sort${sortBy}`;
+
+    const cahchedData = await getCache(cacheKey);
+
+    if (cahchedData) {
+      return res.status(200).json({
+        success: true,
+        fromCache: true,
+        posts: cahchedData.posts,
+        total: cahchedData.total,
+        page: cahchedData.page,
+        limit: cahchedData.limit,
+        sort: cahchedData.sort,
+      });
+    }
 
     let sortCondition = {};
 
@@ -50,17 +69,38 @@ const getAllPost = async (req, res) => {
     if (sortBy === "top") sortCondition = { score: -1 };
     if (sortBy === "oldest") sortCondition = { createdAt: 1 };
 
-    const posts = await postModel
-      .find({ isDeleted: false })
-      .sort(sortCondition)
-      .limit(limit)
-      .skip(skip)
-      .populate("author", "name email")
-      .lean()
+    const [posts, postCount] = await Promise.all([
+      postModel
+        .find({ isDeleted: false })
+        .sort(sortCondition)
+        .limit(limit)
+        .skip(skip)
+        .populate("author", "name email")
+        .lean(),
+      postModel.countDocuments({ isDeleted: false }),
+    ]);
 
-    const postCount = await postModel.countDocuments({ isDeleted: false });
+    const cachedPosts = {
+      posts,
+      total: postCount,
+      page,
+      limit,
+      sort: sortBy,
+    };
 
-    res.status(200).json({ success: true, posts, total:postCount,page,limit});
+    await setCache(cacheKey, cachedPosts, 300).catch((err) =>
+      console.log("Cache set error:", err.message)
+    );
+
+    res.status(200).json({
+      success: true,
+      fromCache: false,
+      posts,
+      total: postCount,
+      page,
+      limit,
+      sort: sortBy,
+    });
   } catch (error) {
     console.log("Error during fetching all posts:", error.message);
     res.status(500).json({ success: false, message: "Server error" });
@@ -76,16 +116,30 @@ const getPostById = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Invalid author" });
 
-    const post = await postModel
-      .find(postId)
-      .populate("author", "email name")
-      .lean()
+    const cacheKey = `post:${postId}`;
 
-    if (!post || post.isDleted) {
+    const cachedPost = await getCache(cacheKey);
+
+    if (cachedPost) {
+      return res.status(200).json({
+        success: true,
+        formCache: true,
+        cachedPost,
+      });
+    }
+
+    const post = await postModel
+      .findById(postId)
+      .populate("author", "email name")
+      .lean();
+
+    if (!post || post.isDeleted) {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    res.status(200).json({ success: true, post });
+    await setCache(cacheKey, post, 600);
+
+    res.status(200).json({ success: true, fromCache: false, post });
   } catch (error) {
     console.log("Error during fetching the post:", error.message);
     res.status(500).json({ success: false, message: "Server error" });
@@ -122,6 +176,9 @@ const updatePost = async (req, res) => {
         .json({ success: false, message: "Post not updated" });
     }
 
+    await deleteCache("posts:allPosts:*");
+    await deleteCache(`post:${postId}`);
+
     res
       .status(200)
       .json({ success: true, message: "Post updated succefully", updatedPost });
@@ -155,6 +212,10 @@ const deletePost = async (req, res) => {
     await post.deleteOne();
     await commentModel.deleteMany({ post: postId });
 
+    await deleteCache("posts:allPosts:*");
+    await deleteCache(`post:${postId}`);
+    await deleteCache(`comments:post:${postId}:*`);
+
     res.status(200).json({ success: true, message: "Post deleted succefully" });
   } catch (error) {
     console.log("Error during deleting the post:", error.message);
@@ -164,7 +225,7 @@ const deletePost = async (req, res) => {
 
 const hardDeletePost = async (req, res) => {
   try {
-    const postId = req.params;
+    const postId = req.params.postId;
 
     if (!isValidObjectId(postId))
       return res.status(400).json({ success: false, message: "Invalid post" });
@@ -183,6 +244,9 @@ const hardDeletePost = async (req, res) => {
     await voteModel.deleteMany({ post: postId });
     await likeCommentModel.deleteMany({ comment: { $in: post.comments } });
     await postModel.findByIdAndDelete(postId);
+
+    await deleteCache("posts:allPosts:*");
+    await deleteCache(`comments:post:${postId}:*`);
 
     return res.json({
       success: true,

@@ -28,7 +28,7 @@ const postSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    isDleted: {
+    isDeleted: {
       type: Boolean,
       default: false,
     },

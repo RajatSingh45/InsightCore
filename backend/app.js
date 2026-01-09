@@ -1,5 +1,6 @@
-import express from 'express'
 import dotenv from 'dotenv'
+dotenv.config()
+import express from 'express'
 import cors from 'cors'
 import { connectDB } from './configs/db.js'
 import cookieParser from 'cookie-parser'
@@ -8,11 +9,11 @@ import adminRouter from './routes/admin.router.js'
 import postRouter from './routes/post.router.js'
 import commentRouter from './routes/comment.router.js'
 import voteRouter from './routes/vote.router.js'
-import uploadRouter from './routes/upload.router.js'
+// import uploadRouter from './routes/upload.router.js'
+// import redisRouter from './routes/redis.router.js'
 
 const app=express()
 
-dotenv.config()
 
 connectDB()
 
@@ -37,9 +38,9 @@ app.use("/comments",commentRouter)
 
 app.use("/vote",voteRouter)
 
-app.use("/uploads",uploadRouter)
+// app.use("/uploads",uploadRouter)
 
-app.use("/redis")
+// app.use("/redis",redisRouter)
 
 export default app
 

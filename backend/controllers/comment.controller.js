@@ -3,6 +3,7 @@ import commentModel from "../models/comment.model.js";
 import postModel from "../models/post.model.js";
 import likeCommentModel from "../models/likeCommentModel.js";
 import userModel from "../models/user.model.js";
+import { deleteCache, getCache, setCache } from "../services/cache.service.js";
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -77,6 +78,8 @@ const addComment = async (req, res) => {
     post.comments.push(populatedComment._id);
     await post.save();
 
+    await deleteCache(`comments:post:${postId}:*`);
+
     res.status(201).json({
       success: true,
       message: "You commented on post successfully",
@@ -104,10 +107,19 @@ const replyToComment = async (req, res) => {
     }
 
     const parent = await commentModel.findById(parentId);
-    if (!parent)
+    if (!parent){
       return res
         .status(404)
         .json({ success: false, message: "parent not found" });
+    }
+
+     const postId=parent.post.toString();
+
+     if(!postId){
+          return res
+        .status(404)
+        .json({ success: false, message: "parent not found" });
+     }
 
     const depth = await computeParentDepth(parentId);
 
@@ -130,11 +142,16 @@ const replyToComment = async (req, res) => {
         .json({ success: false, message: "New Reply not created yet" });
     }
 
-    const populatedReply = await newReply.populate(
-      "parentComment",
-      "commentedBy",
-      "name email role"
-    );
+    const populatedReply = await newReply.populate({
+      path: "parentComment",
+      populate: {
+        path: "commentedBy",
+        select: "name email role",
+      },
+    });
+
+    await deleteCache(`comments:comment:${parentId}:*`);
+    await deleteCache(`comments:post:${postId}:*`);
 
     res.status(201).json({
       success: true,
@@ -167,6 +184,8 @@ const updateComment = async (req, res) => {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
 
+     const postId=comment.post.toString()
+
     const updatedComment = await commentModel
       .findByIdAndUpdate(commentId, { ...req.body }, { new: true })
       .populate("commentedBy", "name email");
@@ -176,6 +195,9 @@ const updateComment = async (req, res) => {
         .status(500)
         .json({ success: false, message: "Comment not updated" });
     }
+
+    await deleteCache(`comments:comment:${commentId}:*`);
+    await deleteCache(`comments:post:${postId}:*`);
 
     res.status(200).json({
       success: true,
@@ -219,11 +241,16 @@ const deleteComment = async (req, res) => {
         .json({ success: true, message: "Comment already deleted" });
     }
 
+    const postId=comment.post.toString()
+
     comment.isDeleted = true;
     comment.comment = "";
     comment.deletedBy = req.user._id;
 
     await comment.save({ validateBeforeSave: false });
+
+    await deleteCache(`comments:comment:${commentId}:*`);
+    await deleteCache(`comments:post:${postId}:*`);
 
     res
       .status(200)
@@ -256,6 +283,21 @@ const getCommentsByPost = async (req, res) => {
     }
 
     const skip = (page - 1) * limit;
+
+    const key = `comments:post:${postId}:page:${page}:limit:${limit}`;
+
+    const cachedData = await getCache(key);
+
+    if (cachedData) {
+      return res.status(200).json({
+        success: true,
+        fromCache: true,
+        page: cachedData.page,
+        limit: cachedData.limit,
+        totalTopCommentsCount: cachedData.totalTopCommentsCount,
+        comments: cachedData.commentsWithReplies,
+      });
+    }
 
     const topComments = await commentModel
       .find({ post: postId, parentComment: null, isDeleted: false })
@@ -293,8 +335,18 @@ const getCommentsByPost = async (req, res) => {
       isDeleted: false,
     });
 
+    const cachedComments = {
+      page,
+      limit,
+      totalTopCommentsCount,
+      commentsWithReplies,
+    };
+
+    await setCache(key, cachedComments, 180);
+
     res.status(200).json({
       success: true,
+      fromCache: false,
       page,
       limit,
       totalTopCommentsCount,
@@ -325,6 +377,22 @@ const getThrededComments = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
+    const key = `comments:comment:${commentId}:page:${page}:limit:${limit}`;
+
+    const cachedData = await getCache(key);
+
+    if (cachedData) {
+      return res.status(200).json({
+        success: true,
+        fromCache: true,
+        parent: cachedData.parent,
+        page: cachedData.page,
+        limit: cachedData.limit,
+        totalReplies: cachedData.totalReplies,
+        replies: cachedData.replies,
+      });
+    }
+
     const replies = await commentModel
       .find({
         parentComment: parent._id,
@@ -347,9 +415,25 @@ const getThrededComments = async (req, res) => {
       isDeleted: false,
     });
 
-    res
-      .status(200)
-      .json({ success: true, parent, page, limit, totalReplies, replies });
+    const cachedReplies = {
+      parent,
+      page,
+      limit,
+      totalReplies,
+      replies,
+    };
+
+    await setCache(key, cachedReplies, 180);
+
+    res.status(200).json({
+      success: true,
+      fromCache: false,
+      parent,
+      page,
+      limit,
+      totalReplies,
+      replies,
+    });
   } catch (error) {
     console.log("Error during fetching the threaded comments:", error.message);
     res.status(500).json({ success: false, message: "Server error" });
@@ -368,6 +452,8 @@ const deleteCommentsByPost = async (req, res) => {
         .json({ success: false, message: "Please select post" });
     }
 
+    const commentId=post.comments.toString()
+
     if (req.user.role !== "admin" && req.user.role !== "moderator") {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
@@ -380,9 +466,13 @@ const deleteCommentsByPost = async (req, res) => {
         deletedBy: req.user._id,
       }
     );
+
+    await deleteCache(`comments:post:${postId}:*`);
+    await deleteCache(`comments:comment:${commentId}:*`);
+
     res.status(200).json({ success: true, message: "Deleted all comments" });
   } catch (error) {
-    console.log("Error during fetching the comments:", error.message);
+    console.log("Error during deleting the comments by post:", error.message);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -413,6 +503,8 @@ const likeOnComment = async (req, res) => {
         .json({ success: false, message: "Comment not found" });
     }
 
+     const postId=comment.post.toString()
+
     const userLiked = await userModel
       .findById(userId)
       .select("name email role");
@@ -436,14 +528,12 @@ const likeOnComment = async (req, res) => {
 
       await comment.save();
 
-      return res
-        .status(200)
-        .json({
-          success: true,
-          message: "Comment get like by you",
-          comment,
-          userLiked,
-        });
+      return res.status(200).json({
+        success: true,
+        message: "Comment get like by you",
+        comment,
+        userLiked,
+      });
     } else if (existingLike.value === value) {
       await likeCommentModel.deleteOne();
 
@@ -473,14 +563,15 @@ const likeOnComment = async (req, res) => {
 
     await comment.save();
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Like and dislike get switched",
-        comment,
-        userLiked,
-      });
+    await deleteCache(`comments:comment:${commentId}:*`);
+    await deleteCache(`comments:post:${postId}:*`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Like and dislike get switched",
+      comment,
+      userLiked,
+    });
   } catch (error) {
     console.log("Error during like comment:", error.message);
     return res.status(500).json({ success: false, message: "Server Error" });
@@ -492,7 +583,9 @@ const hardDeleteComment = async (req, res) => {
     const commentId = req.params;
 
     if (!isValidObjectId(commentId))
-      return res.status(400).json({ success: false, message: "Invalid comment" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid comment" });
 
     const comment = await commentModel.findById(commentId);
     if (!comment)
@@ -500,13 +593,19 @@ const hardDeleteComment = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Comment not found" });
 
+
     if (req.user.role !== "admin") {
       return res.status(400).json({ success: false, message: "Unauthorized" });
     }
 
+    const postId=comment.post.toString()
+
     await commentModel.findByIdAndDelete(commentId);
     await commentModel.deleteMany({ parentComment: commentId });
-    await likeCommentModel.deleteMany({comment:commentId})
+    await likeCommentModel.deleteMany({ comment: commentId });
+
+    await deleteCache(`comments:comment:${commentId}:*`);
+    await deleteCache(`comments:post:${postId}:*`);
 
     return res.json({
       success: true,
@@ -527,5 +626,5 @@ export {
   deleteCommentsByPost,
   updateComment,
   likeOnComment,
-  hardDeleteComment
+  hardDeleteComment,
 };

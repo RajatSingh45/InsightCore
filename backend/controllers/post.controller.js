@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import voteModel from "../models/vote.model.js";
 import likeCommentModel from "../models/likeCommentModel.js";
 import {deleteCache, getCache, setCache } from "../services/cache.service.js";
+import postQueue from "../queues/post.queue.js";
 // import redis from "../configs/redis.js";
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -30,6 +31,10 @@ const createPost = async (req, res) => {
     const newPost = await post.populate("author", "name email");
 
     await deleteCache("posts:allPosts:*");
+
+    await postQueue.add("process-post",{
+      postId:post._id.toString()
+    });
 
     res
       .status(201)

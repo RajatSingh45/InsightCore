@@ -37,6 +37,10 @@ const postSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    processed:{
+      type:Boolean,
+      default:false
+    },
     tags: [String],
   },
   { timestamps: true }

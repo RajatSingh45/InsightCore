@@ -1,11 +1,11 @@
 import dotenv from 'dotenv'
 dotenv.config()
-
 import { Worker } from "bullmq";
 import redis from "../configs/redis.js";
 import postModel from "../models/post.model.js";
 import { connectDB } from "../configs/db.js";
 import mongoose from "mongoose";
+import { generateSummary, generateTags } from '../services/ai.services.js';
 
 const startWorker = async () => {
   try {
@@ -19,17 +19,26 @@ const startWorker = async () => {
     const worker = new Worker(
       "post-processing",
       async (job) => {
+        try{
         const { postId } = job.data;
 
         console.log("Processing post:", postId);
 
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const post=await postModel.findById(postId);
+        
+        const summary=await generateSummary(post.content);
+        const tags=await generateTags(post.content);
 
-        await postModel.findByIdAndUpdate(postId, {
-          processed: true,
-        });
+        await postModel.findByIdAndUpdate(postId,{
+          summary,
+          tags,
+          processed:true
+        })
 
         console.log("Post processed:", postId);
+      }catch(err){
+         throw err;
+      }
       },
       {
         connection: redis,

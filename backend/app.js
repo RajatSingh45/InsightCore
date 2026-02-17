@@ -9,8 +9,8 @@ import adminRouter from './routes/admin.router.js'
 import postRouter from './routes/post.router.js'
 import commentRouter from './routes/comment.router.js'
 import voteRouter from './routes/vote.router.js'
-// import uploadRouter from './routes/upload.router.js'
-// import redisRouter from './routes/redis.router.js'
+import path from 'path'
+import uploadRouter from './routes/upload.router.js'
 
 const app=express()
 
@@ -38,9 +38,10 @@ app.use("/comments",commentRouter)
 
 app.use("/vote",voteRouter)
 
-// app.use("/uploads",uploadRouter)
+app.use("/uploads", uploadRouter)
 
-// app.use("/redis",redisRouter)
+app.use("/uploads",express.static(path.join(process.cwd(),"uploads")))
+
 
 export default app
 

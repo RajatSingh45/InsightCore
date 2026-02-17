@@ -9,7 +9,7 @@ const generateSummary=async(text)=>{
    "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn",
     {inputs:text},
     {headers}
-   )
+   );
 
    return res.data[0].summary_text;
 }

@@ -11,6 +11,7 @@ import commentRouter from './routes/comment.router.js'
 import voteRouter from './routes/vote.router.js'
 import path from 'path'
 import uploadRouter from './routes/upload.router.js'
+import searchRouter from './routes/search.posts.router.js'
 
 const app=express()
 
@@ -41,6 +42,8 @@ app.use("/vote",voteRouter)
 app.use("/uploads", uploadRouter)
 
 app.use("/uploads",express.static(path.join(process.cwd(),"uploads")))
+
+app.use("/search",searchRouter)
 
 
 export default app

@@ -16,4 +16,5 @@ postRouter.delete("/delete/:postId",userAuth(["user","admin"]),deletePost)
 
 postRouter.delete("hard-delete/:postId",userAuth(["admin"]),hardDeletePost)
 
+
 export default postRouter

@@ -299,24 +299,24 @@ To stop the project:
 ---
 
 # 📡 API Documentation
-**Authentication**
-POST /auth/register
-POST /auth/login
+**Authentication:**
+1.POST /auth/register
+2.POST /auth/login
 
-**Posts**
-POST /posts
-GET /posts
-GET /posts/:id
-PATCH /posts/:id
-DELETE /posts/:id
+**Posts:**
+1.POST /posts
+2.GET /posts
+3.GET /posts/:id
+4.PATCH /posts/:id
+5.DELETE /posts/:id
 
 **Comments**
-POST /comments/:postId
-POST /comments/reply/:commentId
-GET /comments/get-comments/:postId
+1.POST /comments/:postId
+2.POST /comments/reply/:commentId
+3.GET /comments/get-comments/:postId
 
 **Search**
-GET /posts/search?q=node&page=1
+1.GET /posts/search?q=node&page=1
 
 ---
 
@@ -344,15 +344,19 @@ Used for:
 Example tested scenarios:
 
 1.Creating posts with images
+![Create Post](./backend/assests/CreatePost.png)
 
-2.AI-generated summaries
+2.Comments on post
+![Comment](./backend/assests/comment.png)
 
-3.Nested comment threads
+3.Reply on post
+![Reply on comment](./backend/assests/Reply.png)
 
-4.Voting system
+4.Upload image
+![Upload image](./backend/assests/Uploads.png)
 
 5.Search results
-
+![Search result](./backend/assests/Search.png)
 ---
 
 # ⚠ Error Handling & Edge Cases
@@ -417,7 +421,7 @@ These ensure the backend scales efficiently as data grows.
 ✔ Advanced moderation tools
 ✔ React frontend
 ✔ Docker deployment
-✔ Cloud storage (S3✔  / GCS)
+✔ Cloud storage (S3 / GCS)
 
 ---
 

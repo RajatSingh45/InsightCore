@@ -15,6 +15,7 @@ This system showcases modern backend engineering practices including async proce
 ✔ Scalable API Design
 
 This project focuses on real backend architecture, performance optimization, and scalable API systems.
+
 ---
 
 # 📑 Table of Contents
@@ -36,6 +37,7 @@ This project focuses on real backend architecture, performance optimization, and
 ✔ Learning Outcomes
 ✔ Future Enhancements
 ✔ Credits
+
 ---
 
 # 🧠 About The Project
@@ -51,6 +53,7 @@ It demonstrates how a backend can:
 - provide intelligent search
 
 The architecture separates API processing, background jobs, caching, and search indexing to ensure high performance and scalability.
+
 ---
 
 # ⭐ Key Features
@@ -86,6 +89,7 @@ The architecture separates API processing, background jobs, caching, and search 
 *Performance Optimization*
 ✔ Redis caching
 ✔ Background processing using BullMQ
+
 ---
 
 # 🏗 System Architecture
@@ -175,6 +179,7 @@ The search system supports:
  ->Text highlights
  ->Pagination
  ->Field boosting
+
 ---
 
 # Tech Stack
@@ -239,6 +244,7 @@ README.md
 ✔ Separation of concerns
 ✔ Maintainable codebase
 ✔ Scalable backend design
+
 ---
 
 # ⚙️ Setup & Installation
